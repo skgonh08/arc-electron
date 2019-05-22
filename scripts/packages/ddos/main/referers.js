@@ -1,0 +1,12 @@
+const referers = [];
+referers.push('http://www.google.com/?q=');
+referers.push('https://www.yandex.by/search/?lr=157&text=');
+referers.push('https://www.yandex.ru/search/?lr=157&text=');
+referers.push('https://go.mail.ru/search?q=');
+referers.push('https://nova.rambler.ru/search?query=');
+referers.push('http://search.tut.by/?query=');
+referers.push('https://www.bing.com/search?q=');
+referers.push('https://search.yahoo.com/search?p=');
+referers.push('https://szukaj.wp.pl/szukaj.html?q=');
+referers.push('https://szukaj.onet.pl/wyniki.html?qt=');
+module.exports = referers;
