@@ -3,6 +3,8 @@ const path = require('path');
 /**
  * A class that simulate HTTP flod by making HTTP requests in bulk.
  * The intensity of the flood is configurable in ARC's UI.
+ *
+ * Partially based on `@sergdudko/hulk`.
  */
 class HttpFlood {
   /**
