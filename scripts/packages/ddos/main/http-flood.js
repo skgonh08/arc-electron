@@ -28,7 +28,7 @@ class HttpFlood extends EventEmitter {
    * - sample - Number. A number of requests to make. 0 for nulimited.
    * - delay - Number. A number of milliseconds between a request.
    * - threads - Number. Number of threads to use to run the request. More threads means
-   * more pararell requests but also more resources use.
+   * more pararell requests but also more resources used.
    */
   constructor(opts) {
     super();
