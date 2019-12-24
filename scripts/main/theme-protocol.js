@@ -1,4 +1,4 @@
-const {session} = require('electron');
+const { session } = require('electron');
 const path = require('path');
 const log = require('./logger');
 const fs = require('fs-extra');
@@ -26,7 +26,6 @@ const fs = require('fs-extra');
 class ThemesProtocolHandler {
   constructor() {
     this._requestHandler = this._requestHandler.bind(this);
-    this._registrationHandler = this._registrationHandler.bind(this);
   }
   /**
    * Registers the protocol handler.
@@ -36,14 +35,10 @@ class ThemesProtocolHandler {
     log.debug('Registering themes protocol');
     session.fromPartition('persist:arc-window')
     .protocol
-    .registerStringProtocol('themes', this._requestHandler, this._registrationHandler);
-  }
-
-  _registrationHandler(err) {
-    if (err) {
-      log.error('Unable to register themes protocol');
-      log.error(err);
-    }
+    .registerStringProtocol('themes', this._requestHandler);
+    session.fromPartition('persist:arc-task-manager')
+    .protocol
+    .registerStringProtocol('themes', this._requestHandler);
   }
 
   _requestHandler(request, callback) {
@@ -52,44 +47,49 @@ class ThemesProtocolHandler {
     try {
       fs.accessSync(url, fs.constants.R_OK | fs.constants.X_OK);
       return this._loadFileTheme(url, callback);
-    } catch (_) {}
+    } catch (_) {
+      // ..
+    }
     if (url === 'dd1b715f-af00-4ee8-8b0c-2a262b3cf0c8') {
       url = 'advanced-rest-client/arc-electron-default-theme';
     }
     return this._loadInstalledTheme(url, callback);
   }
 
-  _loadInstalledTheme(location, callback) {
-    log.silly('ThemesProtocolHandler::loading theme from ' + location);
-    return this._loadThemeInfo()
-    .then((themes) => {
+  async _loadInstalledTheme(location, callback) {
+    log.info(`loading theme ${location}`);
+    try {
+      const config = await this._loadThemeInfo();
+      const { themes } = config;
       log.debug('Got themes list');
-      const theme = this._findThemeInfo(location, themes);
-      if (theme) {
-        const file = path.join(process.env.ARC_THEMES, theme.mainFile);
-        log.silly('Theme found. Reading theme file: ' + file);
-        return fs.readFile(file, 'utf8');
+      if (location.indexOf('advanced-rest-client/') === 0) {
+        location = '@' + location;
       }
-    })
-    .then((data) => {
+      const theme = this._findThemeInfo(location, themes);
+      if (!theme) {
+        log.error('Theme info not found');
+        callback(-6);
+        return;
+      }
+      const file = path.join(process.env.ARC_THEMES, theme.mainFile);
+      log.silly('Theme found. Reading theme file: ' + file);
+      const data = await fs.readFile(file, 'utf8');
       if (data) {
         log.silly('Sending theme file to renderer.');
         callback({
           data,
-          mimeType: 'application/javascript',
+          mimeType: 'text/css',
           charset: 'utf8'
         });
       } else {
-        log.error('Unable to find theme');
+        log.error('Theme file is empty');
         callback(-6);
       }
-    })
-    .catch((cause) => {
+    } catch (e) {
       log.error('Unable to load theme');
-      log.error(cause);
+      log.error(e.message);
       callback(-6);
-      return;
-    });
+    }
   }
 
   _loadFileTheme(location, callback) {
@@ -98,7 +98,7 @@ class ThemesProtocolHandler {
     .then((data) => {
       callback({
         data,
-        mimeType: 'application/javascript',
+        mimeType: 'text/css',
         charset: 'utf8'
       });
     })
@@ -110,19 +110,20 @@ class ThemesProtocolHandler {
     });
   }
 
-  _loadThemeInfo() {
-    return fs.readJson(process.env.ARC_THEMES_SETTINGS)
-    .catch(() => {
+  async _loadThemeInfo() {
+    try {
+      return await fs.readJson(process.env.ARC_THEMES_SETTINGS);
+    } catch (_) {
       log.warn('Theme file not found', process.env.ARC_THEMES_SETTINGS);
-      return [];
-    });
+      return {};
+    }
   }
 
   _findThemeInfo(id, themes) {
     if (!themes || !themes.length) {
       return;
     }
-    return themes.find((item) => item._id === id);
+    return themes.find((item) => item._id === id || item.name === id);
   }
 }
 

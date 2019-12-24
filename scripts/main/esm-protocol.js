@@ -1,4 +1,4 @@
-const {session, protocol} = require('electron');
+const { session, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const log = require('./logger');
@@ -24,7 +24,6 @@ const mime = require('mime-types');
 class EsmProtocolHandler {
   constructor() {
     this._requestHandler = this._requestHandler.bind(this);
-    this._registrationHandler = this._registrationHandler.bind(this);
     /**
      * Base path to the themes folder.
      * @type {String}
@@ -40,32 +39,32 @@ class EsmProtocolHandler {
     log.debug('Registering components protocol');
     session.fromPartition('persist:arc-window')
     .protocol
-    .registerBufferProtocol('web-module', this._requestHandler, this._registrationHandler);
+    .registerBufferProtocol('web-module', this._requestHandler);
     session.fromPartition('persist:arc-task-manager')
     .protocol
-    .registerBufferProtocol('web-module', this._requestHandler, this._registrationHandler);
+    .registerBufferProtocol('web-module', this._requestHandler);
     protocol
-    .registerBufferProtocol('web-module', this._requestHandler, this._registrationHandler);
-  }
-
-  _registrationHandler(err) {
-    if (err) {
-      log.error('Unable to register web-module protocol');
-      log.error(err);
-    }
+    .registerBufferProtocol('web-module', this._requestHandler);
   }
 
   _requestHandler(request, respond) {
     const url = new URL(request.url);
     let location = this._findFile(url.pathname);
     location = decodeURI(location);
-    console.log(location);
+    log.debug(`Loading: ${location}`);
     fs.readFile(location, (error, data) => {
-      const mimeType = mime.lookup(location) || 'application/octet-stream';
-      respond({
-        mimeType,
-        data
-      });
+      if (error) {
+        log.error(error);
+        // The file or directory cannot be found.
+        // NET_ERROR(FILE_NOT_FOUND, -6)
+        respond(-6);
+      } else {
+        const mimeType = mime.lookup(location) || 'application/octet-stream';
+        respond({
+          mimeType,
+          data
+        });
+      }
     });
   }
 

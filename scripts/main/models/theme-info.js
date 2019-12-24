@@ -1,4 +1,4 @@
-const {ArcPreferences} = require('../../packages/arc-preferences');
+const { ArcPreferences } = require('../../packages/arc-preferences');
 /**
  * A preferences class to store and read theme info file.
  */
@@ -9,8 +9,10 @@ class ThemeInfo extends ArcPreferences {
     });
   }
 
-  defaultSettings() {
-    return Promise.resolve([]);
+  async defaultSettings() {
+    return {
+      themes: []
+    };
   }
 }
 module.exports.ThemeInfo = ThemeInfo;

@@ -1,10 +1,10 @@
-const {ipcMain: ipc} = require('electron');
-const {ThemeInfo} = require('../../../main/models/theme-info');
-const {ThemePluginsManager} = require('../../plugin-manager/main');
+const { ipcMain: ipc } = require('electron');
+const { ThemeInfo } = require('../../../main/models/theme-info');
+const { ThemePluginsManager } = require('../../plugin-manager/main');
 const log = require('../../../main/logger');
 
 class ThemeManager {
-  constructor(arcApp) {
+  constructor(arcApp, skipUpdateChaeck) {
     this.arcApp = arcApp;
     /**
      * ARC default theme ID
@@ -18,7 +18,9 @@ class ThemeManager {
     this._uninstallHandler = this._uninstallHandler.bind(this);
 
     this.manager = new ThemePluginsManager();
-    this._checkUpdates();
+    if (!skipUpdateChaeck) {
+      this._checkUpdates();
+    }
   }
   /**
    * Creates a model for theme info file.
@@ -57,8 +59,9 @@ class ThemeManager {
    */
   _listThemesHandler(e, id) {
     this.themeInfo.load()
-    .then((list) => {
-      e.sender.send('theme-manager-themes-list', id, list);
+    .then((info) => {
+      const { themes } = info;
+      e.sender.send('theme-manager-themes-list', id, themes);
     })
     .catch((cause) => this._handleError(e.sender, id, cause));
   }
@@ -75,7 +78,8 @@ class ThemeManager {
       this.themeInfo.load()
     ])
     .then((result) => {
-      const [settings, themes] = result;
+      const [settings, themesInfo] = result;
+      const { themes } = themesInfo;
       const themeId = settings.theme || this.defaultTheme;
       let theme = this._findThemeInfo(themeId, themes);
       if (!theme) {
@@ -111,21 +115,20 @@ class ThemeManager {
    * @param {String} id
    * @param {String} themeId
    */
-  _activateHandler(e, id, themeId) {
-    this.arcApp.config.load()
-    .then((settings) => {
+  async _activateHandler(e, id, themeId) {
+    try {
+      const settings = await this.arcApp.config.load();
       settings.theme = themeId;
-      return this.arcApp.config.store();
-    })
-    .then(() => {
-      e.sender.send('theme-manager-theme-activated', id);
-    })
-    .catch((cause) => this._handleError(e.sender, id, cause));
+      await this.arcApp.config.store();
+      e.sender.send('theme-manager-theme-activated', id, themeId);
+    } catch (cause) {
+      this._handleError(e.sender, id, cause);
+    }
   }
 
   _installHandler(e, id, name) {
     if (!name || typeof name !== 'string') {
-      e.sender.send('theme-manager-error', id, {message: 'The name is not valid.'});
+      e.sender.send('theme-manager-error', id, { message: 'The name is not valid.' });
       return;
     }
     const index = name.indexOf('#');
@@ -143,7 +146,7 @@ class ThemeManager {
 
   _uninstallHandler(e, id, name) {
     if (!name || typeof name !== 'string') {
-      e.sender.send('theme-manager-error', id, {message: 'The name is not valid.'});
+      e.sender.send('theme-manager-error', id, { message: 'The name is not valid.' });
       return;
     }
     this.manager.uninstall(name)
@@ -168,28 +171,27 @@ class ThemeManager {
     }, 10000);
   }
 
-  __updateCheck() {
-    log.debug('Checking for themes updates.');
-    return this.manager.checkForUpdates()
-    .then((info) => {
-      if (!info) {
-        log.debug('Update not available.');
+  async __updateCheck() {
+    log.debug('Checking for themes updates...');
+    try {
+      const info = await this.manager.checkForUpdates();
+      if (!info || !info.length) {
+        log.debug('Themes update not available.');
         return;
       }
-      const themes = Object.keys(info);
-      if (!themes.length) {
-        log.debug('Update not available.');
-        return;
-      }
-      log.debug('Themes to update', themes);
-      return this.manager.update(info)
-      .then(() => {
-        log.info('Themes updated. The change will be applied with next app reload.');
+      log.debug('Updating themes....');
+      const result = await this.manager.update(info);
+      result.forEach((item) => {
+        if (!result.error) {
+          return;
+        }
+        const { name, message } = item;
+        log.info(`Theme ${name} update error: ${message}`);
       });
-    })
-    .catch((cause) => {
-      log.error(cause);
-    });
+      log.info('Themes updated. The change will be applied with next app reload.');
+    } catch (e) {
+      log.error(e);
+    }
   }
 }
 module.exports.ThemeManager = ThemeManager;
