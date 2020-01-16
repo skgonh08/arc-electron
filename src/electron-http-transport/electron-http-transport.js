@@ -1,7 +1,7 @@
 /**
  * `electron-http-transport`
  *
- * A web comonent to work with @advanced-rest-client/electron-request
+ * A web component to work with @advanced-rest-client/electron-request
  * node package in web components environment
  *
  * @customElement
